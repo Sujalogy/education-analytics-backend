@@ -70,3 +70,11 @@ CREATE INDEX idx_columns_table ON columns(table_id);
 CREATE INDEX idx_columns_name_trgm ON columns USING gin(name gin_trgm_ops);
 
 CREATE INDEX idx_saved_analyses_name ON saved_analyses(name);
+
+
+# DB_USER=surveycto_auth
+# DB_HOST=llforg-dashboards-database.ctycs80ogs1x.ap-south-1.rds.amazonaws.com
+# DB_NAME=surveycto_database
+# DB_PASSWORD=rrYxusds1KdY2
+# DB_PORT=5432
+# PORT=3000

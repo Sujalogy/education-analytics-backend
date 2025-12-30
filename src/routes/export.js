@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const exportController = require('../controllers/exportController');
 
-router.post('/excel', exportController.exportToExcel);
-router.post('/csv', exportController.exportToCSV);
-router.post('/pdf', exportController.exportToPDF);
+// Match frontend calls
+router.post('/pivot', exportController.handlePivotExport);
+router.post('/statistics', exportController.handleStatisticsExport);
 
 module.exports = router;

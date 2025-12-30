@@ -4,7 +4,6 @@ const logger = require('./src/utils/logger');
 const { appPool } = require('./src/config/database');
 
 const PORT = config.port;
-
 // Test database connection
 appPool.query('SELECT NOW()', (err, res) => {
   if (err) {
@@ -15,6 +14,7 @@ appPool.query('SELECT NOW()', (err, res) => {
 });
 
 const server = app.listen(PORT, () => {
+  console.log("ceck")
   logger.info(`Server running in ${config.env} mode on port ${PORT}`);
   logger.info(`API available at http://localhost:${PORT}/api`);
 });
@@ -33,6 +33,14 @@ process.on('SIGTERM', () => {
   server.close(() => {
     logger.info('💥 Process terminated!');
   });
+});
+
+appPool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error("❌ DATABASE CONNECTION ERROR:", err.message);
+  } else {
+    console.log("✅ Database Connected at:", res.rows[0].now);
+  }
 });
 
 module.exports = server;

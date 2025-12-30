@@ -11,10 +11,11 @@ const envSchema = Joi.object({
   APP_DB_NAME: Joi.string().required(),
   APP_DB_USER: Joi.string().required(),
   APP_DB_PASSWORD: Joi.string().required(),
+  // Add SSL validation here
+  APP_DB_SSL: Joi.boolean().default(false), 
   MAX_FILE_SIZE: Joi.number().default(52428800),
   RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
   LOG_LEVEL: Joi.string().default('info'),
-  
 }).unknown();
 
 const { error, value: envVars } = envSchema.validate(process.env);
@@ -32,6 +33,8 @@ module.exports = {
     database: envVars.APP_DB_NAME,
     user: envVars.APP_DB_USER,
     password: envVars.APP_DB_PASSWORD,
+    // Export the SSL setting so database.js can use it
+    ssl: envVars.APP_DB_SSL, 
   },
   maxFileSize: envVars.MAX_FILE_SIZE,
   rateLimit: {

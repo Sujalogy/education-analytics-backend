@@ -4,124 +4,131 @@ const { jsPDF } = require('jspdf');
 require('jspdf-autotable');
 
 class ExportService {
-  async exportToExcel(data, config) {
+  /**
+   * Generates an Excel Workbook buffer
+   */
+  async exportToExcel(data, config = {}) {
     const workbook = new ExcelJS.Workbook();
-    
-    // Main data sheet
-    const dataSheet = workbook.addWorksheet('Data');
-    
+    const sheet = workbook.addWorksheet('Report');
+
     if (data && data.length > 0) {
-      // Add headers
       const headers = Object.keys(data[0]);
-      dataSheet.addRow(headers);
       
-      // Style headers
-      dataSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      dataSheet.getRow(1).fill = {
+      // Add Title row
+      if (config.title) {
+        sheet.mergeCells('A1', `${String.fromCharCode(64 + headers.length)}1`);
+        const titleRow = sheet.getRow(1);
+        titleRow.value = config.title;
+        titleRow.font = { size: 16, bold: true };
+        titleRow.alignment = { horizontal: 'center' };
+      }
+
+      // Add Headers
+      const headerRowIndex = config.title ? 3 : 1;
+      const headerRow = sheet.getRow(headerRowIndex);
+      headerRow.values = headers;
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FF4472C4' }
       };
-      
-      // Add data rows
-      data.forEach(row => {
-        const values = headers.map(header => row[header]);
-        dataSheet.addRow(values);
+
+      // Add Data
+      data.forEach((row, i) => {
+        sheet.addRow(headers.map(h => row[h]));
       });
-      
-      // Auto-fit columns
-      dataSheet.columns.forEach(column => {
-        let maxLength = 0;
-        column.eachCell({ includeEmpty: true }, cell => {
-          const length = cell.value ? cell.value.toString().length : 0;
-          if (length > maxLength) maxLength = length;
-        });
-        column.width = Math.min(maxLength + 2, 50);
+
+      // Auto-fit Columns
+      sheet.columns.forEach(column => {
+        column.width = 20;
       });
     }
 
-    // Add filters sheet if configured
-    if (config && config.includeFilters && config.filters) {
-      const filtersSheet = workbook.addWorksheet('Filters');
-      filtersSheet.addRow(['Column', 'Selected Values']);
-      filtersSheet.getRow(1).font = { bold: true };
-      
-      Object.entries(config.filters).forEach(([column, values]) => {
-        filtersSheet.addRow([column, values.join(', ')]);
+    // Add separate sheet for full Statistics if provided
+    if (config.statistics) {
+      const statSheet = workbook.addWorksheet('Detailed Statistics');
+      statSheet.addRow(['Metric', 'Value']);
+      Object.entries(config.statistics).forEach(([k, v]) => {
+        if (typeof v !== 'object') statSheet.addRow([k, v]);
       });
     }
 
-    // Add statistics sheet if configured
-    if (config && config.includeStatistics && config.statistics) {
-      const statsSheet = workbook.addWorksheet('Statistics');
-      statsSheet.addRow(['Metric', 'Value']);
-      statsSheet.getRow(1).font = { bold: true };
-      
-      Object.entries(config.statistics).forEach(([metric, value]) => {
-        statsSheet.addRow([metric, value]);
-      });
-    }
-
-    // Generate buffer
-    const buffer = await workbook.xlsx.writeBuffer();
-    return buffer;
+    return await workbook.xlsx.writeBuffer();
   }
 
+  /**
+   * Generates a CSV buffer
+   */
   async exportToCSV(data) {
     const csv = Papa.unparse(data);
     return Buffer.from(csv, 'utf-8');
   }
 
-  async exportToPDF(data, stats, chartImage) {
+  /**
+   * Generates a PDF buffer
+   */
+  async exportToPDF(data, stats = null, chartImage = null, title = 'Analytics Report') {
     const doc = new jsPDF();
-    
-    // Add title
+
+    // 1. Title & Date
     doc.setFontSize(20);
-    doc.text('Education Analytics Report', 14, 20);
+    doc.setTextColor(40);
+    doc.text(title, 14, 22);
     
-    // Add date
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
-    
-    // Add statistics if provided
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Report Generated: ${new Date().toLocaleString()}`, 14, 30);
+
+    // 2. Summary Statistics Section
+    let startY = 40;
     if (stats) {
       doc.setFontSize(14);
-      doc.text('Statistics', 14, 45);
-      doc.setFontSize(10);
+      doc.setTextColor(40);
+      doc.text('Key Metrics', 14, startY);
       
-      let yPos = 55;
-      Object.entries(stats).forEach(([key, value]) => {
-        doc.text(`${key}: ${value}`, 14, yPos);
-        yPos += 7;
+      const statRows = [
+        ['Mean', stats.mean?.toFixed(2) || 'N/A', 'Median', stats.median?.toFixed(2) || 'N/A'],
+        ['Std Dev', stats.stdDev?.toFixed(2) || 'N/A', 'Sample Size (n)', stats.count || '0']
+      ];
+
+      doc.autoTable({
+        body: statRows,
+        startY: startY + 5,
+        theme: 'plain',
+        styles: { fontSize: 10 }
       });
+      startY = doc.lastAutoTable.finalY + 15;
     }
 
-    // Add table
+    // 3. Data Table
     if (data && data.length > 0) {
       const headers = Object.keys(data[0]);
-      const rows = data.map(row => headers.map(header => row[header]));
-      
+      const rows = data.map(row => headers.map(h => row[h]));
+
       doc.autoTable({
         head: [headers],
         body: rows,
-        startY: stats ? 100 : 45,
+        startY: startY,
         theme: 'grid',
-        headStyles: { fillColor: [68, 114, 196] }
+        headStyles: { fillColor: [68, 114, 196] },
+        styles: { fontSize: 8 }
       });
     }
 
-    // Add chart if provided
+    // 4. Chart Image
     if (chartImage) {
-      const finalY = doc.lastAutoTable.finalY || 100;
-      if (finalY + 100 < doc.internal.pageSize.height) {
-        doc.addImage(chartImage, 'PNG', 14, finalY + 10, 180, 100);
-      } else {
+      const finalY = doc.lastAutoTable.finalY + 10;
+      // Check if chart fits on page
+      if (finalY + 80 > doc.internal.pageSize.height) {
         doc.addPage();
-        doc.addImage(chartImage, 'PNG', 14, 20, 180, 100);
+        doc.addImage(chartImage, 'PNG', 15, 20, 180, 90);
+      } else {
+        doc.addImage(chartImage, 'PNG', 15, finalY, 180, 90);
       }
     }
 
-    return doc.output('arraybuffer');
+    return Buffer.from(doc.output('arraybuffer'));
   }
 }
 

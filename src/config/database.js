@@ -2,7 +2,6 @@ const { Pool } = require("pg");
 const config = require("./env");
 const logger = require("../utils/logger");
 
-
 const appPool = new Pool({
   host: config.appDb.host,
   port: config.appDb.port,
@@ -12,7 +11,7 @@ const appPool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
-  ssl: config.appDb.ssl || false, // ✅ safer than empty object
+  ssl: config.appDb.ssl ? { rejectUnauthorized: false } : false,
   allowExitOnIdle: false,
 });
 
